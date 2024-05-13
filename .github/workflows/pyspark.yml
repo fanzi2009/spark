@@ -1,0 +1,173 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+name: UT for pyspark
+
+on:
+  workflow_dispatch:
+    inputs:
+      java:
+        required: false
+        type: string
+        default: 8
+      branch:
+        description: Branch to run the build against
+        required: false
+        type: string
+        default: branch-3.4
+      hadoop:
+        description: Hadoop version to run with. HADOOP_PROFILE environment variable should accept it.
+        required: false
+        type: string
+        default: hadoop3
+      envs:
+        description: Additional environment variables to set when running the tests. Should be in JSON format.
+        required: false
+        type: string
+        default: '{}'
+      jobs:
+        description: >-
+          Jobs to run, and should be in JSON format. The values should be matched with the job's key defined
+          in this file, e.g., build. See precondition job below.
+        required: false
+        type: string
+        default: ''
+jobs:
+
+
+  pyspark:
+    name: "Build modules: ${{ matrix.modules }}"
+    runs-on: ubuntu-20.04
+    container:
+      image: ghcr.io/apache/apache-spark-ci-image:branch-3.4-9060199591
+    strategy:
+      fail-fast: false
+      matrix:
+        java:
+          - ${{ inputs.java }}
+        modules:
+          - >-
+            pyspark-errors
+          - >-
+            pyspark-sql, pyspark-mllib, pyspark-resource
+          - >-
+            pyspark-core, pyspark-streaming, pyspark-ml
+          - >-
+            pyspark-pandas
+          - >-
+            pyspark-pandas-slow
+          - >-
+            pyspark-connect
+    env:
+      MODULES_TO_TEST: ${{ matrix.modules }}
+      HADOOP_PROFILE: ${{ inputs.hadoop }}
+      HIVE_PROFILE: hive2.3
+      GITHUB_PREV_SHA: ${{ github.event.before }}
+      SPARK_LOCAL_IP: localhost
+      SKIP_UNIDOC: true
+      SKIP_MIMA: true
+      SKIP_PACKAGING: true
+      METASPACE_SIZE: 1g
+    steps:
+    - name: Checkout Spark repository
+      uses: actions/checkout@v3
+      # In order to fetch changed files
+      with:
+        fetch-depth: 0
+        repository: apache/spark
+        ref: ${{ inputs.branch }}
+    - name: Add GITHUB_WORKSPACE to git trust safe.directory
+      run: |
+        git config --global --add safe.directory ${GITHUB_WORKSPACE}
+    - name: Sync the current branch with the latest in Apache Spark
+      if: github.repository != 'apache/spark'
+      run: |
+        echo "APACHE_SPARK_REF=$(git rev-parse HEAD)" >> $GITHUB_ENV
+        git fetch https://github.com/$GITHUB_REPOSITORY.git ${GITHUB_REF#refs/heads/}
+        git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' merge --no-commit --progress --squash FETCH_HEAD
+        git -c user.name='Apache Spark Test Account' -c user.email='sparktestacc@gmail.com' commit -m "Merged commit" --allow-empty
+    # Cache local repositories. Note that GitHub Actions cache has a 2G limit.
+    - name: Cache Scala, SBT and Maven
+      uses: actions/cache@v3
+      with:
+        path: |
+          build/apache-maven-*
+          build/scala-*
+          build/*.jar
+          ~/.sbt
+        key: build-${{ hashFiles('**/pom.xml', 'project/build.properties', 'build/mvn', 'build/sbt', 'build/sbt-launch-lib.bash', 'build/spark-build-info') }}
+        restore-keys: |
+          build-
+    - name: Cache Coursier local repository
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/coursier
+        key: pyspark-coursier-${{ hashFiles('**/pom.xml', '**/plugins.sbt') }}
+        restore-keys: |
+          pyspark-coursier-
+    - name: Free up disk space
+      shell: 'script -q -e -c "bash {0}"'
+      run: |
+        if [ -f ./dev/free_disk_space_container ]; then
+          ./dev/free_disk_space_container
+        fi
+    - name: Install Java ${{ matrix.java }}
+      uses: actions/setup-java@v3
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - name: List Python packages (Python 3.9, PyPy3)
+      run: |
+        python3.9 -m pip list
+        pypy3 -m pip list
+    - name: Install Conda for pip packaging test
+      if: ${{ matrix.modules == 'pyspark-errors' }}
+      run: |
+        curl -s https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh > miniconda.sh
+        bash miniconda.sh -b -p $HOME/miniconda
+    # Run the tests.
+    - name: Run tests
+      env: ${{ fromJSON(inputs.envs) }}
+      shell: 'script -q -e -c "bash {0}"'
+      run: |
+        if [[ "$MODULES_TO_TEST" == "pyspark-errors" ]]; then
+          export PATH=$PATH:$HOME/miniconda/bin
+          export SKIP_PACKAGING=false
+          echo "Python Packaging Tests Enabled!"
+        fi
+        ./dev/run-tests --parallelism 1 --modules "$MODULES_TO_TEST"
+    - name: Upload coverage to Codecov
+      if: fromJSON(inputs.envs).PYSPARK_CODECOV == 'true'
+      uses: codecov/codecov-action@v2
+      with:
+        files: ./python/coverage.xml
+        flags: unittests
+        name: PySpark
+    - name: Upload test results to report
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results-${{ matrix.modules }}--8-${{ inputs.hadoop }}-hive2.3
+        path: "**/target/test-reports/*.xml"
+    - name: Upload unit tests log files
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: unit-tests-log-${{ matrix.modules }}--8-${{ inputs.hadoop }}-hive2.3
+        path: "**/target/unit-tests.log"
