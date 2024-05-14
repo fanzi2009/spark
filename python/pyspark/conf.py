@@ -135,6 +135,19 @@ class SparkConf:
                 self._jconf = None
                 self._conf = {}
 
+        self.set("spark.jars", "/root/chukonu/scala/target/scala-2.12/chukonu_2.12-0.5.1.jar")
+        self.set("spark.kryo.unsafe", "true")
+        self.set("spark.plugins", "org.pacman.chukonu.ChukonuPlugin")
+        self.set("spark.chukonu.enableNativeCodegen", "true")
+        self.set("spark.memory.offHeap.enabled", "true")
+        self.set("spark.memory.offHeap.size", "5g")
+        self.set("spark.chukonu.cxx", "/usr/bin/g++")
+        self.set("spark.chukonu.root", "/root/chukonu/install")
+        self.set("spark.chukonu.stagingdir", "/root/temp/staging")
+        self.set("spark.chukonu.compileCacheDir", "/root/temp/cache")
+        self.set("spark.executor.processTreeMetrics.enabled", "true")
+        self.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")                       
+
     def set(self, key: str, value: str) -> "SparkConf":
         """Set a configuration property."""
         # Try to set self._jconf first if JVM is created, set self._conf if JVM is not created yet.
