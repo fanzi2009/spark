@@ -74,6 +74,16 @@ trait SharedSparkSessionBase
       // this rule may potentially block testing of other optimization rules such as
       // ConstantPropagation etc.
       .set(SQLConf.OPTIMIZER_EXCLUDED_RULES.key, ConvertToLocalRelation.ruleName)
+      .set("spark.kryo.unsafe", "true")
+      .set("spark.memory.offHeap.size", "5g")
+      .set("spark.plugins", "org.pacman.chukonu.ChukonuPlugin")
+      .set("spark.chukonu.root", "/opt/chukonu")
+      .set("spark.chukonu.stagingdir", "/opt/staging")
+      .set("spark.chukonu.compileCacheDir", "/opt/cache")
+      .set("spark.chukonu.cxx", "/usr/bin/g++")
+      .set("spark.chukonu.enableNativeCodegen", "true")
+      .set("spark.memory.offHeap.enabled", "true")
+      .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     conf.set(
       StaticSQLConf.WAREHOUSE_PATH,
       conf.get(StaticSQLConf.WAREHOUSE_PATH) + "/" + getClass.getCanonicalName)
