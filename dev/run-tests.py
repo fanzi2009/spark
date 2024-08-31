@@ -553,10 +553,10 @@ def main():
                 determine_modules_for_files(changed_files), deduplicated=False
             )
 
-            if modules.root not in modules_to_test:
-                # If root module is not found, only test the intersected modules.
-                # If root module is found, just run the modules as specified initially.
-                test_modules = list(set(modules_to_test).intersection(test_modules))
+            # if modules.root not in modules_to_test:
+            #     # If root module is not found, only test the intersected modules.
+            #     # If root module is found, just run the modules as specified initially.
+            #     test_modules = list(set(modules_to_test).intersection(test_modules))
 
         changed_modules = test_modules
         if len(changed_modules) == 0:
