@@ -389,6 +389,7 @@ object SparkBuild extends PomBuild {
     // Setting version for the protobuf compiler. This has to be propagated to every sub-project
     // even if the project is not using it.
     PB.protocVersion := protoVersion,
+    unmanagedJars in Compile += file("/opt/chukonu/jar/chukonu_2.12-0.5.1.jar")
   )
 
   def enable(settings: Seq[Setting[_]])(projectRef: ProjectRef) = {
