@@ -128,7 +128,7 @@ jobs:
     needs: precondition
     if: fromJson(needs.precondition.outputs.required).build == 'true'
     # Ubuntu 20.04 is the latest LTS. The next LTS is 22.04.
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
@@ -366,7 +366,9 @@ jobs:
       METASPACE_SIZE: 1g
       LD_LIBRARY_PATH: /tmp/cache:/opt/chukonu/lib
     steps:
-    - run: apt-get update && apt-get install -yq cmake pkg-config libboost-dev libboost-system-dev libboost-chrono-dev libboost-program-options-dev libboost-thread-dev libboost-iostreams-dev libboost-regex-dev libboost-fiber-dev libtbb-dev libspdlog-dev libfmt-dev libgtest-dev libbenchmark-dev libmsgsl-dev libnuma-dev libjemalloc-dev openjdk-11-jdk ssh git curl build-essential
+    - run: apt-get update && apt-get install -yq g++-10 cmake pkg-config libboost-dev libboost-system-dev libboost-chrono-dev libboost-program-options-dev libboost-thread-dev libboost-iostreams-dev libboost-regex-dev libboost-fiber-dev libtbb-dev libspdlog-dev libfmt-dev libgtest-dev libbenchmark-dev libmsgsl-dev libnuma-dev libjemalloc-dev openjdk-11-jdk ssh git curl build-essential
+    - run: update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 100
+    - run: update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100
     - run: mkdir /tmp/staging
     - run: mkdir /tmp/cache
     - run: wget https://github.com/fanzi2009/spark/releases/download/v3.5.1/chukonu.tgz && tar zxvf chukonu.tgz -C /opt
