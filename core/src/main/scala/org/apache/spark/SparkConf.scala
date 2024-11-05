@@ -70,6 +70,28 @@ class SparkConf(loadDefaults: Boolean) extends Cloneable with Logging with Seria
     loadFromSystemProperties(false)
   }
 
+  loadForChukonu()
+
+  private[spark] def loadForChukonu(): SparkConf = {
+    val chukonuHome = sys.env.get("CHUKONU_HOME")
+    val chukonuTemp = sys.env.get("CHUKONU_TEMP")
+    if (chukonuHome.isEmpty || chukonuTemp.isEmpty) {
+      throw new IllegalArgumentException("CHUKONU_HOME or CHUKONU_TEMP is not set")
+    }
+
+    set("spark.kryo.unsafe", "true")
+    set("spark.memory.offHeap.size", "5g")
+    set("spark.plugins", "org.pacman.chukonu.ChukonuPlugin")
+    set("spark.chukonu.root", chukonuHome.get)
+    set("spark.chukonu.stagingdir", s"${chukonuTemp.get}/staging")
+    set("spark.chukonu.compileCacheDir", s"${chukonuTemp.get}/cache")
+    set("spark.chukonu.cxx", "/usr/bin/g++")
+    set("spark.chukonu.enableNativeCodegen", "true")
+    set("spark.memory.offHeap.enabled", "true")
+    set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+    this
+  }
+
   private[spark] def loadFromSystemProperties(silent: Boolean): SparkConf = {
     // Load any spark.* system properties
     for ((key, value) <- Utils.getSystemProperties if key.startsWith("spark.")) {
